@@ -1,4 +1,10 @@
 document.addEventListener('DOMContentLoaded', function() {
+    // Check if map container exists before initializing
+    const mapContainer = document.getElementById('lcd-precinct-map');
+    if (!mapContainer) {
+        return; // Exit if map container is not found
+    }
+
     // Initialize the map centered on Lewis County, WA
     var map = L.map('lcd-precinct-map').setView([46.5, -122.6], 9);
     var selectedLayer = null;
