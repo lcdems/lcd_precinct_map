@@ -36,10 +36,7 @@ class LCD_County_Map_Election_Integration {
     }
 
     private function is_election_plugin_active() {
-        if (!function_exists('is_plugin_active')) {
-            include_once(ABSPATH . 'wp-admin/includes/plugin.php');
-        }
-        return is_plugin_active('lcd-election-results/lcd-election-results.php');
+        return class_exists('LCD_Election_Results');
     }
 
     public function extend_map_config($config, $atts) {
