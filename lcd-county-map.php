@@ -341,11 +341,8 @@ class LCD_County_Map {
     }
 
     public function render_election_map($atts) {
-        // Check if election plugin is active
-        if (!function_exists('is_plugin_active')) {
-            include_once(ABSPATH . 'wp-admin/includes/plugin.php');
-        }
-        if (!is_plugin_active('lcd-election-results/lcd-election-results.php')) {
+        // Check if election plugin is active by checking for the class
+        if (!class_exists('LCD_Election_Results')) {
             return '<div class="lcd-map-error">This map requires the LCD Election Results plugin to be active.</div>';
         }
 
