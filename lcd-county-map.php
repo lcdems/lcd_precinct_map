@@ -315,7 +315,8 @@ class LCD_County_Map {
     public function render_map($atts) {
         $config = shortcode_atts(array(
             'height' => '600px',
-            'width' => '100%'
+            'width' => '100%',
+            'show_election_data' => false
         ), $atts);
 
         // Allow other plugins to modify the configuration
@@ -334,7 +335,19 @@ class LCD_County_Map {
         wp_localize_script('lcd-county-map-js', 'lcdMapData', $map_data);
 
         return sprintf(
-            '<div id="lcd-precinct-map" style="height: %s; width: %s;"></div>',
+            '<div class="lcd-map-container%s" style="height: %s; width: %s;">
+                <div class="lcd-precinct-sidebar">
+                    <div class="lcd-precinct-search">
+                        <div class="search-input-wrapper">
+                            <input type="text" id="precinct-search" placeholder="Search precincts...">
+                            <button type="button" class="search-clear" aria-label="Clear search">&times;</button>
+                        </div>
+                    </div>
+                    <div class="lcd-precinct-list"></div>
+                </div>
+                <div id="lcd-precinct-map"></div>
+            </div>',
+            $config['show_election_data'] ? ' election-mode' : '',
             esc_attr($config['height']),
             esc_attr($config['width'])
         );
@@ -350,10 +363,8 @@ class LCD_County_Map {
         $atts = shortcode_atts(array(
             'width' => '100%',
             'height' => '600px',
+            'show_election_data' => true  // Force election mode
         ), $atts);
-
-        // Force election mode
-        $atts['show_election_data'] = true;
 
         // Return the map with election mode enabled
         return $this->render_map($atts);

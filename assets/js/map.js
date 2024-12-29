@@ -5,18 +5,25 @@ document.addEventListener('DOMContentLoaded', function() {
         return; // Exit if map container is not found
     }
 
-    // Initialize the map centered on Lewis County, WA
-    var map = L.map('lcd-precinct-map').setView([46.5, -122.6], 9);
+    // Initialize the map centered on Lewis County, WA with a closer zoom
+    var map = L.map('lcd-precinct-map').setView([46.5, -122.6],9);
     var selectedLayer = null;
     var precinctData = {};
     var boundaryLayer = null;
     var activeDistricts = new Set();  // Track active districts
+    var precinctLayers = {}; // Store precinct layers by precinct number
 
     // Define colors for legislative districts
     var districtColors = {
         19: '#ff7f00',  // Orange
         20: '#377eb8',  // Blue
         35: '#4daf4a'   // Green
+    };
+
+    // Define the default county view for reuse
+    const defaultView = {
+        center: [46.5, -122.6],
+        zoom: 9
     };
 
     // Add OpenStreetMap tiles
@@ -89,6 +96,9 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
         info.update(layer.feature.properties);
+        
+        // Highlight corresponding list item
+        highlightPrecinctListItem(layer.feature.properties.PRECINCT_N);
     }
 
     // Reset highlight
@@ -96,17 +106,51 @@ document.addEventListener('DOMContentLoaded', function() {
         var layer = e.target;
         if (layer !== selectedLayer && boundaryLayer) {
             boundaryLayer.resetStyle(layer);
+            // Close popup if this isn't the selected layer
+            if (layer !== selectedLayer) {
+                layer.closePopup();
+            }
         }
         info.update();
+        
+        // Reset list item highlight if not selected
+        if (layer !== selectedLayer) {
+            resetPrecinctListItemHighlight(layer.feature.properties.PRECINCT_N);
+        }
     }
 
     // Select feature
     function selectFeature(e) {
         var layer = e.target;
         
+        // If clicking the already selected layer, deselect it
+        if (selectedLayer === layer) {
+            boundaryLayer.resetStyle(selectedLayer);
+            selectedLayer = null;
+            info.update();
+            // Clear list selection
+            document.querySelectorAll('.lcd-precinct-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            // Close any open popup
+            layer.closePopup();
+            map.closePopup();
+            // Reset zoom to show full county
+            map.setView(defaultView.center, defaultView.zoom, {
+                animate: true,
+                duration: 0.5
+            });
+            return;
+        }
+        
         // If there's a previously selected layer, reset its style
         if (selectedLayer && selectedLayer !== layer && boundaryLayer) {
             boundaryLayer.resetStyle(selectedLayer);
+            // Reset previous list item
+            resetPrecinctListItemHighlight(selectedLayer.feature.properties.PRECINCT_N);
+            // Close any open popup
+            selectedLayer.closePopup();
+            map.closePopup();
         }
 
         // Set the new selected layer
@@ -123,11 +167,23 @@ document.addEventListener('DOMContentLoaded', function() {
             color: '#666',
             fillOpacity: 0.9
         });
+        
+        // Highlight list item
+        selectPrecinctListItem(precNum);
+        
+        // Ensure the selected item is visible in the list
+        const listItem = document.querySelector(`.lcd-precinct-item[data-precinct="${precNum}"]`);
+        if (listItem) {
+            listItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
     }
 
     // Process voting data
     function processVotingData(feature) {
         const precNum = feature.properties.PRECINCT_N;
+        // Skip precinct #0
+        if (precNum === '0' || precNum === 0) return;
+        
         const district = feature.properties.LEGISLATIV;
         if (!precinctData[precNum]) {
             precinctData[precNum] = {
@@ -144,6 +200,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Bind events to boundary layer
     function onEachFeature(feature, layer) {
+        // Skip precinct #0
+        if (feature.properties.PRECINCT_N === '0' || feature.properties.PRECINCT_N === 0) return;
+
         layer.on({
             mouseover: highlightFeature,
             mouseout: resetHighlight,
@@ -151,6 +210,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
         const precNum = feature.properties.PRECINCT_N;
+        precinctLayers[precNum] = layer;
         const data = precinctData[precNum] || {};
 
         // Bind popup with feature properties
@@ -163,6 +223,132 @@ document.addEventListener('DOMContentLoaded', function() {
             popupContent += "<p><strong>Legislative District:</strong> " + data.legislativeDistrict + "</p>";
         }
         layer.bindPopup(popupContent);
+    }
+
+    // Populate precinct list
+    function populatePrecinctList() {
+        const precinctList = document.querySelector('.lcd-precinct-list');
+        if (!precinctList) return;
+
+        // Sort precincts by number
+        const sortedPrecincts = Object.entries(precinctData)
+            .sort((a, b) => parseInt(a[0]) - parseInt(b[0]));
+
+        // Create and append list items
+        sortedPrecincts.forEach(([precNum, data]) => {
+            const item = document.createElement('div');
+            item.className = 'lcd-precinct-item';
+            item.dataset.precinct = precNum;
+            item.textContent = `#${precNum} ${data.name}`;
+            
+            item.addEventListener('click', () => {
+                const layer = precinctLayers[precNum];
+                if (layer) {
+                    // Trigger the click event on the map layer
+                    layer.fire('click');
+                    // Pan to the precinct
+                    map.fitBounds(layer.getBounds(), {
+                        padding: [50, 50],
+                        maxZoom: 12
+                    });
+                }
+            });
+            
+            item.addEventListener('mouseover', () => {
+                const layer = precinctLayers[precNum];
+                if (layer) {
+                    layer.fire('mouseover');
+                }
+            });
+            
+            item.addEventListener('mouseout', () => {
+                const layer = precinctLayers[precNum];
+                if (layer) {
+                    layer.fire('mouseout');
+                }
+            });
+            
+            precinctList.appendChild(item);
+        });
+    }
+
+    // Handle precinct search
+    function setupPrecinctSearch() {
+        const searchInput = document.getElementById('precinct-search');
+        const clearButton = document.querySelector('.search-clear');
+        if (!searchInput || !clearButton) return;
+
+        function updateClearButton() {
+            clearButton.classList.toggle('visible', searchInput.value.length > 0);
+        }
+
+        function clearSearch() {
+            searchInput.value = '';
+            updateClearButton();
+            // Show all items
+            document.querySelectorAll('.lcd-precinct-item').forEach(item => {
+                item.style.display = '';
+            });
+            searchInput.focus();
+        }
+
+        searchInput.addEventListener('input', (e) => {
+            const searchTerm = e.target.value.toLowerCase();
+            const items = document.querySelectorAll('.lcd-precinct-item');
+            
+            items.forEach(item => {
+                const text = item.textContent.toLowerCase();
+                if (text.includes(searchTerm)) {
+                    item.style.display = '';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+            
+            updateClearButton();
+        });
+
+        clearButton.addEventListener('click', clearSearch);
+
+        // Clear on Escape key
+        searchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                clearSearch();
+            }
+        });
+
+        // Initial state
+        updateClearButton();
+    }
+
+    // Highlight precinct list item
+    function highlightPrecinctListItem(precNum) {
+        const item = document.querySelector(`.lcd-precinct-item[data-precinct="${precNum}"]`);
+        if (item && !item.classList.contains('active')) {
+            item.classList.add('hover');
+        }
+    }
+
+    // Reset precinct list item highlight
+    function resetPrecinctListItemHighlight(precNum) {
+        const item = document.querySelector(`.lcd-precinct-item[data-precinct="${precNum}"]`);
+        if (item && !item.classList.contains('active')) {
+            item.classList.remove('hover');
+        }
+    }
+
+    // Select precinct list item
+    function selectPrecinctListItem(precNum) {
+        // Remove active class from all items
+        document.querySelectorAll('.lcd-precinct-item').forEach(item => {
+            item.classList.remove('active');
+        });
+        
+        // Add active class to selected item
+        const item = document.querySelector(`.lcd-precinct-item[data-precinct="${precNum}"]`);
+        if (item) {
+            item.classList.add('active');
+        }
     }
 
     // Custom shapefile loader with coordinate transformation
@@ -222,6 +408,10 @@ document.addEventListener('DOMContentLoaded', function() {
         // Add the boundary layer to the map
         boundaryLayer.addTo(map);
 
+        // Populate the precinct list after data is loaded
+        populatePrecinctList();
+        setupPrecinctSearch();
+
         // Handle boundary layer errors
         boundaryLayer.on('data:error', function(error) {
             console.error('Error loading boundary data:', error);
@@ -256,6 +446,17 @@ document.addEventListener('DOMContentLoaded', function() {
             boundaryLayer.resetStyle(selectedLayer);
             selectedLayer = null;
             info.update(); // Clear the info when deselecting
+            // Close any open popups
+            map.closePopup();
+            // Reset to default view
+            map.setView(defaultView.center, defaultView.zoom, {
+                animate: true,
+                duration: 0.5
+            });
+            // Clear list selection
+            document.querySelectorAll('.lcd-precinct-item').forEach(item => {
+                item.classList.remove('active');
+            });
         }
     });
 
