@@ -182,7 +182,12 @@ jQuery(document).ready(function($) {
         window.lcdMapLayers.boundary.eachLayer(function(layer) {
             var precinctNumber = layer.feature.properties.PRECINCT_N;
             var precinctName = layer.feature.properties.PRECINCT;
-            var precinctData = votesData[precinctNumber] || { votes: 0, population: 0 };
+            var precinctData = votesData[precinctNumber] || { 
+                votes: 0, 
+                active_voters: 0,
+                inactive_voters: 0,
+                total_registered: 0
+            };
             
             var baseStyle = {
                 fillColor: colorScale(precinctData.votes),
@@ -204,9 +209,11 @@ jQuery(document).ready(function($) {
                     fillOpacity: 0.9
                 },
                 votes: precinctData.votes,
-                population: precinctData.population,
-                turnout: precinctData.population > 0 ? 
-                    (precinctData.votes / precinctData.population) * 100 : 0,
+                active_voters: precinctData.active_voters,
+                inactive_voters: precinctData.inactive_voters,
+                total_registered: precinctData.total_registered,
+                turnout: precinctData.active_voters > 0 ? 
+                    (precinctData.votes / precinctData.active_voters) * 100 : 0,
                 precinctName: precinctName
             };
 
@@ -230,9 +237,23 @@ jQuery(document).ready(function($) {
                     var data = this._votesData;
                     var content = '<div class="precinct-popup">';
                     content += '<h4>' + data.precinctName + ' (#' + precinctNumber + ')</h4>';
-                    content += '<p><strong>Population:</strong> ' + data.population.toLocaleString() + '</p>';
-                    content += '<p><strong>Total Votes:</strong> ' + data.votes.toLocaleString() + '</p>';
-                    content += '<p><strong>Turnout:</strong> ' + data.turnout.toFixed(1) + '%</p>';
+                    
+                    // Voter Registration Section
+                    content += '<div class="voter-registration">';
+                    content += '<h5>Voter Registration</h5>';
+                    content += '<p><strong>Active Voters:</strong> ' + data.active_voters.toLocaleString() + '</p>';
+                    content += '<p><strong>Inactive Voters:</strong> ' + data.inactive_voters.toLocaleString() + '</p>';
+                    content += '<p><strong>Total Registered:</strong> ' + data.total_registered.toLocaleString() + '</p>';
+                    content += '</div>';
+
+                    // Voting Results Section
+                    content += '<div class="voting-results">';
+                    content += '<h5>Voting Results</h5>';
+                    content += '<p><strong>Total Votes Cast:</strong> ' + data.votes.toLocaleString() + '</p>';
+                    content += '<p><strong>Turnout:</strong> ' + data.turnout.toFixed(1) + '%<br>';
+                    content += '<small>(percentage of active voters who voted)</small></p>';
+                    content += '</div>';
+
                     content += '</div>';
 
                     L.popup()
@@ -253,12 +274,15 @@ jQuery(document).ready(function($) {
 
         // Calculate totals
         var totalVotes = 0;
-        var totalPopulation = 0;
+        var totalActiveVoters = 0;
+        var totalInactiveVoters = 0;
         Object.values(votesData).forEach(data => {
             totalVotes += data.votes;
-            totalPopulation += data.population;
+            totalActiveVoters += data.active_voters || 0;
+            totalInactiveVoters += data.inactive_voters || 0;
         });
-        var countyTurnout = totalPopulation > 0 ? (totalVotes / totalPopulation) * 100 : 0;
+        var totalRegistered = totalActiveVoters + totalInactiveVoters;
+        var voterTurnout = totalActiveVoters > 0 ? (totalVotes / totalActiveVoters) * 100 : 0;
 
         // Adjust date display
         var displayDate = new Date(electionDate);
@@ -273,9 +297,21 @@ jQuery(document).ready(function($) {
                 month: 'long',
                 day: 'numeric'
             }) + '</em></p>';
-        content += '<p><strong>Total Population:</strong> ' + totalPopulation.toLocaleString() + '<br/>(includes all ages and voting status)</p>';
-        content += '<p><strong>Total Votes:</strong> ' + totalVotes.toLocaleString() + '</p>';
-        content += '<p><strong>County Turnout:</strong> ' + countyTurnout.toFixed(1) + '%</p>';
+        
+        // Voter Registration Statistics
+        content += '<div class="voter-statistics">';
+        content += '<h5>Voter Registration</h5>';
+        content += '<p><strong>Active Voters:</strong> ' + totalActiveVoters.toLocaleString() + '</p>';
+        content += '<p><strong>Inactive Voters:</strong> ' + totalInactiveVoters.toLocaleString() + '</p>';
+        content += '<p><strong>Total Registered:</strong> ' + totalRegistered.toLocaleString() + '</p>';
+        content += '</div>';
+
+        // Voting Results Statistics
+        content += '<div class="voter-statistics">';
+        content += '<h5>Voting Results</h5>';
+        content += '<p><strong>Total Votes Cast:</strong> ' + totalVotes.toLocaleString() + '</p>';
+        content += '<p><strong>Voter Turnout:</strong> ' + voterTurnout.toFixed(1) + '%<br>';
+        content += '<small>(percentage of active voters who voted)</small></p>';
         content += '</div>';
 
         // Add color scale with rounded numbers
@@ -294,6 +330,45 @@ jQuery(document).ready(function($) {
         content += '</div>';
 
         legend.html(content);
+
+        // Add some CSS for the new sections
+        if (!document.getElementById('lcd-voter-stats-style')) {
+            const style = document.createElement('style');
+            style.id = 'lcd-voter-stats-style';
+            style.textContent = `
+                .voter-statistics {
+                    margin: 15px 0;
+                    padding: 10px;
+                    background: #f8f9fa;
+                    border-radius: 4px;
+                }
+                .voter-statistics h5 {
+                    margin: 0 0 10px 0;
+                    color: #495057;
+                }
+                .voter-statistics p {
+                    margin: 5px 0;
+                }
+                .voter-statistics small {
+                    color: #6c757d;
+                    font-size: 0.85em;
+                }
+                .precinct-popup {
+                    min-width: 250px;
+                }
+                .precinct-popup h5 {
+                    margin: 10px 0 5px 0;
+                    color: #495057;
+                }
+                .voter-registration, .voting-results {
+                    margin: 10px 0;
+                    padding: 8px;
+                    background: #f8f9fa;
+                    border-radius: 4px;
+                }
+            `;
+            document.head.appendChild(style);
+        }
     }
 
     function resetMap() {
@@ -411,12 +486,12 @@ jQuery(document).ready(function($) {
                         var content = '<h4>' + this._electionData.results.precinct_name + ' (#' + precinctNumber + ')</h4>';
                         
                         // Add population and turnout info
-                        var population = parseInt(this._electionData.results.population, 10);
+                        var population = parseInt(this._electionData.results.registered_voters, 10);
                         var turnoutPercentage = population > 0 ? 
                             ((data.totalVotes / population) * 100).toFixed(1) : 0;
                         
                         content += '<p>';
-                        content += '<strong>Population:</strong> ' + population.toLocaleString() + '<br>';
+                        content += '<strong>Registered Voters:</strong> ' + population.toLocaleString() + '<br>';
                         content += '<strong>Total Votes:</strong> ' + data.totalVotes.toLocaleString() + '<br>';
                         content += '<strong>Turnout:</strong> ' + turnoutPercentage + '%';
                         content += '</p>';
@@ -518,7 +593,7 @@ jQuery(document).ready(function($) {
         var partyTotals = {};
 
         Object.values(results).forEach(function(precinct) {
-            totalPopulation += parseInt(precinct.population || 0, 10);
+            totalPopulation += parseInt(precinct.registered_voters || 0, 10);
             precinct.candidates.forEach(function(candidate) {
                 var votes = parseInt(candidate.votes, 10);
                 totalVotes += votes;

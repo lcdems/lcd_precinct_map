@@ -147,11 +147,59 @@ class LCD_County_Map_Election_Integration {
         );
     }
 
+    private function get_registered_voters_data() {
+        global $wpdb;
+        $voters_table = $wpdb->prefix . 'election_voters';
+        
+        // Debug: Check table and sample data
+        error_log('LCD County Map: Checking voter data table');
+        $sample = $wpdb->get_results("SELECT * FROM {$voters_table} LIMIT 1");
+        error_log('LCD County Map: Sample voter record: ' . print_r($sample, true));
+        
+        // Get count of both active and inactive registered voters by precinct
+        $query = "SELECT 
+                    precinct_code,
+                    precinct_part,
+                    status_code,
+                    COUNT(*) as voter_count 
+                 FROM {$voters_table} 
+                 GROUP BY precinct_code, precinct_part, status_code";
+        
+        error_log('LCD County Map: Voter query: ' . $query);
+        $results = $wpdb->get_results($query, ARRAY_A);
+        error_log('LCD County Map: Raw voter results: ' . print_r($results, true));
+        
+        $voter_data = array();
+        foreach ($results as $row) {
+            // Convert precinct code from '0040' format to '40' to match election results
+            $precinct_key = ltrim($row['precinct_code'], '0');
+            
+            if (!isset($voter_data[$precinct_key])) {
+                $voter_data[$precinct_key] = array(
+                    'active' => 0,
+                    'inactive' => 0,
+                    'total' => 0
+                );
+            }
+            
+            $count = intval($row['voter_count']);
+            if ($row['status_code'] === 'Active') {
+                $voter_data[$precinct_key]['active'] += $count;
+            } else {
+                $voter_data[$precinct_key]['inactive'] += $count;
+            }
+            $voter_data[$precinct_key]['total'] += $count;
+        }
+        
+        error_log('LCD County Map: Final voter data: ' . print_r($voter_data, true));
+        return $voter_data;
+    }
+
     public function get_precinct_results($election_date, $race_name) {
         global $wpdb;
         
-        // Get population data from the voting shapefile
-        $population_data = $this->get_population_data();
+        // Get registered voters data instead of population
+        $voter_data = $this->get_registered_voters_data();
         
         $results = $wpdb->get_results($wpdb->prepare(
             "SELECT 
@@ -175,11 +223,17 @@ class LCD_County_Map_Election_Integration {
         foreach ($results as $row) {
             $precinct_number = strval($row->precinct_number);
             if (!isset($formatted[$precinct_number])) {
+                $voter_counts = isset($voter_data[$precinct_number]) ? 
+                    $voter_data[$precinct_number] : 
+                    array('active' => 0, 'inactive' => 0, 'total' => 0);
+                
                 $formatted[$precinct_number] = array(
                     'precinct_name' => $row->precinct_name,
                     'race_name' => $row->race_name,
-                    'population' => isset($population_data[$precinct_number]) ? 
-                        $population_data[$precinct_number] : 0,
+                    'registered_voters' => $voter_counts['active'], // Use active voters for turnout
+                    'active_voters' => $voter_counts['active'],
+                    'inactive_voters' => $voter_counts['inactive'],
+                    'total_registered' => $voter_counts['total'],
                     'candidates' => array()
                 );
             }
@@ -191,25 +245,6 @@ class LCD_County_Map_Election_Integration {
         }
 
         return $formatted;
-    }
-
-    private function get_population_data() {
-        $population_data = array();
-        $voting_file = plugin_dir_path(dirname(__FILE__)) . 'gis-precincts/voting_ref/voting.shp';
-        
-        if (file_exists($voting_file)) {
-            require_once plugin_dir_path(dirname(__FILE__)) . 'includes/shapefile.inc.php';
-            $shapefile = new ShapeFile($voting_file);
-            while ($record = $shapefile->getRecord(SHAPEFILE_RECORD_BOTH)) {
-                if (isset($record['dbf']['PRECINCT_N']) && isset($record['dbf']['POPULATION'])) {
-                    $precinct_number = strval($record['dbf']['PRECINCT_N']);
-                    $population = intval($record['dbf']['POPULATION']);
-                    $population_data[$precinct_number] = $population;
-                }
-            }
-        }
-        
-        return $population_data;
     }
 
     public function ajax_get_election_results() {
@@ -226,7 +261,7 @@ class LCD_County_Map_Election_Integration {
         check_ajax_referer('lcd_election_map', 'nonce');
 
         $election_date = sanitize_text_field($_POST['election_date']);
-        $population_data = $this->get_population_data();
+        $voter_data = $this->get_registered_voters_data();
 
         global $wpdb;
 
@@ -243,10 +278,15 @@ class LCD_County_Map_Election_Integration {
             $results = $this->get_precinct_results($election_date, $race);
             foreach ($results as $precinct_number => $data) {
                 if (!isset($precinct_votes[$precinct_number])) {
+                    $voter_counts = isset($voter_data[$precinct_number]) ? 
+                        $voter_data[$precinct_number] : 
+                        array('active' => 0, 'inactive' => 0, 'total' => 0);
+
                     $precinct_votes[$precinct_number] = array(
                         'votes' => 0,
-                        'population' => isset($population_data[$precinct_number]) ? 
-                            $population_data[$precinct_number] : 0
+                        'active_voters' => $voter_counts['active'],
+                        'inactive_voters' => $voter_counts['inactive'],
+                        'total_registered' => $voter_counts['total']
                     );
                 }
                 // Sum up all votes for this precinct in this race
@@ -261,6 +301,7 @@ class LCD_County_Map_Election_Integration {
             }
         }
 
+        error_log('LCD County Map: Final precinct votes data: ' . print_r($precinct_votes, true));
         wp_send_json_success($precinct_votes);
     }
 } 
