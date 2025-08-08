@@ -1,0 +1,209 @@
+/* LCD County Map Admin Styles */
+
+.lcd-pco-management {
+    max-width: 1200px;
+}
+
+.pco-list-container,
+.pco-orphaned-container {
+    margin-top: 20px;
+}
+
+.pco-item {
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    margin-bottom: 15px;
+    padding: 0;
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+}
+
+.pco-item.orphaned {
+    border-color: #d63638;
+    background: #fff2f2;
+}
+
+.pco-header {
+    background: #f6f7f7;
+    border-bottom: 1px solid #c3c4c7;
+    padding: 15px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.pco-item.orphaned .pco-header {
+    background: #fef2f2;
+    border-bottom-color: #d63638;
+}
+
+.pco-header h4 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #1d2327;
+}
+
+.orphaned-label {
+    color: #d63638;
+    font-weight: 400;
+    font-size: 14px;
+}
+
+.pco-display {
+    padding: 20px;
+}
+
+.pco-display p {
+    margin: 8px 0;
+    color: #50575e;
+}
+
+.pco-display .no-pco {
+    color: #787c82;
+    font-style: italic;
+}
+
+.pco-edit-form {
+    padding: 20px;
+    background: #f9f9f9;
+    border-top: 1px solid #c3c4c7;
+}
+
+.pco-edit-form .form-table {
+    margin: 0;
+}
+
+.pco-edit-form .form-table th {
+    width: 150px;
+    padding: 10px 0;
+}
+
+.pco-edit-form .form-table td {
+    padding: 10px 0;
+}
+
+.pco-form-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px solid #dcdcde;
+}
+
+.pco-edit-btn,
+.pco-cancel-btn {
+    min-width: 80px;
+}
+
+.pco-delete-btn {
+    margin-left: auto;
+}
+
+/* Tab navigation improvements */
+.nav-tab-wrapper {
+    margin-bottom: 20px;
+}
+
+.nav-tab {
+    outline: none;
+}
+
+/* Form styling improvements */
+.form-table th {
+    vertical-align: top;
+    padding-top: 15px;
+}
+
+.form-table .description {
+    color: #646970;
+    font-size: 13px;
+    margin-top: 5px;
+    margin-bottom: 0;
+}
+
+/* Responsive design */
+@media screen and (max-width: 782px) {
+    .pco-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+    
+    .pco-header h4 {
+        margin-bottom: 0;
+    }
+    
+    .pco-form-actions {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 15px;
+    }
+    
+    .pco-delete-btn {
+        margin-left: 0;
+    }
+}
+
+/* Animation for smooth transitions */
+.pco-edit-form {
+    transition: all 0.3s ease;
+}
+
+/* Loading state */
+.pco-item.loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.pco-item.loading::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.8);
+    z-index: 1;
+}
+
+/* Success/error states */
+.pco-item.success {
+    border-color: #00a32a;
+    background: #f0f6fc;
+}
+
+.pco-item.error {
+    border-color: #d63638;
+    background: #fff2f2;
+}
+
+/* Better button spacing */
+.button + .button {
+    margin-left: 5px;
+}
+
+/* Improved focus states */
+.pco-edit-btn:focus,
+.pco-cancel-btn:focus,
+.pco-delete-btn:focus {
+    box-shadow: 0 0 0 2px #2271b1;
+    outline: 2px solid transparent;
+}
+
+/* File upload section styling */
+.form-table input[type="file"] {
+    padding: 3px;
+}
+
+/* Section spacing */
+h2 + .description {
+    margin-top: -10px;
+    margin-bottom: 20px;
+}
+
+h3 + .description {
+    margin-top: -10px;
+    margin-bottom: 15px;
+}

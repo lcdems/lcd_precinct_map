@@ -342,17 +342,23 @@
     
     .lcd-map-container {
         flex-direction: column;
+        height: 100vh;
+        min-height: 800px;
     }
     
     .lcd-precinct-sidebar {
         width: 100%;
-        height: 200px;
+        height: 180px;
         border-right: none;
         border-bottom: 1px solid #ccc;
+        flex-shrink: 0;
+        margin-bottom: 8px;
     }
     
     #lcd-precinct-map {
-        height: calc(100% - 200px);
+        height: calc(100vh - 200px) !important;
+        min-height: 400px;
+        flex-grow: 1;
     }
 } 
 
@@ -370,4 +376,354 @@
 .lcd-map-container.election-mode #lcd-precinct-map {
     width: 100%;
     height: 100%;
+}
+
+/* PCO Contact Styles */
+.lcd-precinct-popup {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    max-width: 300px;
+}
+
+.lcd-precinct-popup h4 {
+    margin: 0 0 10px 0;
+    color: #333;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.lcd-precinct-popup h5 {
+    margin: 0 0 8px 0;
+    color: #555;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.lcd-precinct-popup p {
+    margin: 5px 0;
+    color: #666;
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+.lcd-precinct-popup .pco-section {
+    margin-top: 10px;
+}
+
+.lcd-precinct-popup .no-pco {
+    color: #888;
+    font-style: italic;
+}
+
+.lcd-precinct-popup .pco-actions {
+    margin-top: 10px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.lcd-contact-btn {
+    background: #0073aa;
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    transition: background-color 0.2s ease;
+    display: inline-block;
+    text-decoration: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 150px;
+    text-align: center;
+    line-height: 1.2;
+}
+
+.lcd-contact-btn:hover {
+    background: #005a87;
+    color: white;
+}
+
+.lcd-become-pco-btn {
+    background: #46b450;
+    max-width: 180px;
+    font-size: 11px;
+    padding: 8px 10px;
+}
+
+.lcd-become-pco-btn:hover {
+    background: #2ea2cc;
+}
+
+/* Modal Styles */
+.lcd-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 999999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+    padding: 20px;
+    box-sizing: border-box;
+    visibility: visible;
+    opacity: 1;
+}
+
+.lcd-modal-backdrop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1;
+}
+
+.lcd-modal-content {
+    position: relative;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    max-width: 500px;
+    width: 90%;
+    max-height: calc(100vh - 40px);
+    overflow-y: auto;
+    z-index: 2;
+    margin: 0 auto;
+}
+
+.lcd-modal-header {
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid #e5e5e5;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.lcd-modal-header h3 {
+    margin: 0;
+    color: #333;
+    font-size: 20px;
+    font-weight: 600;
+}
+
+.lcd-modal-close {
+    background: none;
+    border: none;
+    font-size: 28px;
+    cursor: pointer;
+    color: #666;
+    padding: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: background-color 0.2s ease;
+    flex-shrink: 0;
+    line-height: 1;
+    font-weight: normal;
+}
+
+.lcd-modal-close:hover {
+    background: #f5f5f5;
+    color: #333;
+}
+
+.lcd-modal-body {
+    padding: 24px;
+}
+
+.lcd-form-group {
+    margin-bottom: 20px;
+}
+
+.lcd-form-group label {
+    display: block;
+    margin-bottom: 6px;
+    color: #333;
+    font-weight: 500;
+    font-size: 14px;
+}
+
+.lcd-form-control {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    font-family: inherit;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    box-sizing: border-box;
+}
+
+.lcd-form-control:focus {
+    outline: none;
+    border-color: #0073aa;
+    box-shadow: 0 0 0 2px rgba(0, 115, 170, 0.1);
+}
+
+.lcd-form-control:invalid {
+    border-color: #d63638;
+}
+
+.lcd-form-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 1px solid #e5e5e5;
+}
+
+.lcd-btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.lcd-btn-primary {
+    background: #0073aa;
+    color: white;
+}
+
+.lcd-btn-primary:hover:not(:disabled) {
+    background: #005a87;
+}
+
+.lcd-btn-primary:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+}
+
+.lcd-btn-secondary {
+    background: #f1f1f1;
+    color: #333;
+    border: 1px solid #ddd;
+}
+
+.lcd-btn-secondary:hover {
+    background: #e5e5e5;
+}
+
+.lcd-success-message,
+.lcd-error-message {
+    text-align: center;
+    padding: 20px;
+}
+
+.lcd-success-message h4 {
+    color: #46b450;
+    margin: 0 0 10px 0;
+}
+
+.lcd-error-message h4 {
+    color: #d63638;
+    margin: 0 0 10px 0;
+}
+
+.lcd-success-message p,
+.lcd-error-message p {
+    color: #666;
+    margin: 0 0 20px 0;
+    line-height: 1.5;
+}
+
+.button-loading {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+/* Mobile Responsiveness for PCO Contact */
+@media (max-width: 768px) {
+    .lcd-modal {
+        padding: 10px;
+        align-items: center;
+        justify-content: center;
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        z-index: 999999 !important;
+    }
+    
+    .lcd-modal-content {
+        width: calc(100% - 20px);
+        max-width: 90vw;
+        margin: 0 auto;
+        max-height: calc(100vh - 40px);
+        position: relative !important;
+        z-index: 999999 !important;
+        background: white !important;
+        display: block !important;
+    }
+    
+    .lcd-modal-backdrop {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        z-index: 999998 !important;
+        background: rgba(0, 0, 0, 0.5) !important;
+    }
+    
+    .lcd-modal-header {
+        padding: 16px 20px 12px;
+        position: relative !important;
+        z-index: 999999 !important;
+    }
+    
+    .lcd-modal-header h3 {
+        font-size: 18px;
+    }
+    
+    .lcd-modal-body {
+        padding: 20px;
+        position: relative !important;
+        z-index: 999999 !important;
+    }
+    
+    .lcd-form-actions {
+        flex-direction: column;
+    }
+    
+    .lcd-btn {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .lcd-contact-btn {
+        max-width: none;
+        white-space: normal;
+        text-overflow: unset;
+        overflow: visible;
+        padding: 10px 12px;
+        font-size: 13px;
+    }
+    
+    .lcd-become-pco-btn {
+        max-width: none;
+        font-size: 12px;
+    }
 } 

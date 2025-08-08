@@ -213,15 +213,42 @@ document.addEventListener('DOMContentLoaded', function() {
         precinctLayers[precNum] = layer;
         const data = precinctData[precNum] || {};
 
-        // Bind popup with feature properties
-        var popupContent = '<h4>Precinct Information</h4>';
-        popupContent += "<p><strong>#" + precNum + "</strong> " + (data.name || feature.properties.PRECINCT) + "</p>";
+        // Bind popup with feature properties and PCO information
+        var popupContent = '<div class="lcd-precinct-popup">';
+        popupContent += '<h4>Precinct Information</h4>';
+        var precinctName = data.name || feature.properties.PRECINCT || '';
+        var displayName = precinctName ? "#" + precNum + " - " + precinctName : "#" + precNum;
+        popupContent += "<p><strong>" + displayName + "</strong></p>";
         if (data.population) {
             popupContent += "<p><strong>Population:</strong> " + data.population.toLocaleString() + "</p>";
         }
         if (data.legislativeDistrict) {
             popupContent += "<p><strong>Legislative District:</strong> " + data.legislativeDistrict + "</p>";
         }
+        
+        // Add PCO information
+        var pcoData = lcdMapData.pcoData && lcdMapData.pcoData[precNum] ? lcdMapData.pcoData[precNum] : null;
+        popupContent += '<hr style="margin: 15px 0;">';
+        popupContent += '<div class="pco-section">';
+        popupContent += '<h5>Precinct Committee Officer (PCO)</h5>';
+        
+        if (pcoData && pcoData.has_pco) {
+            popupContent += '<p><strong>Name:</strong> ' + (pcoData.name || 'Not provided') + '</p>';
+            if (pcoData.name) {
+                popupContent += '<div class="pco-actions">';
+                popupContent += '<button type="button" class="lcd-contact-btn" data-precinct="' + precNum + '" data-action="contact">Contact PCO</button>';
+                popupContent += '</div>';
+            }
+        } else {
+            popupContent += '<p class="no-pco">No PCO assigned to this precinct</p>';
+            popupContent += '<div class="pco-actions">';
+            popupContent += '<button type="button" class="lcd-contact-btn lcd-become-pco-btn" data-precinct="' + precNum + '" data-action="become">Become a PCO</button>';
+            popupContent += '</div>';
+        }
+        
+        popupContent += '</div>';
+        popupContent += '</div>';
+        
         layer.bindPopup(popupContent);
     }
 
@@ -465,4 +492,143 @@ document.addEventListener('DOMContentLoaded', function() {
         // Let Leaflet handle the coordinate transformations naturally
         // No need to refresh layers on zoom
     });
+
+    // PCO Contact functionality
+    function initializePCOContactSystem() {
+        // Event delegation for contact buttons in popups
+        document.addEventListener('click', function(e) {
+            if (e.target.matches('.lcd-contact-btn')) {
+                e.preventDefault();
+                
+                const precinct = e.target.getAttribute('data-precinct');
+                const action = e.target.getAttribute('data-action');
+                
+                openContactModal(precinct, action === 'become');
+            }
+        });
+
+        // Modal event handlers
+        const modal = document.getElementById('lcd-contact-modal');
+        const closeButtons = modal.querySelectorAll('.lcd-modal-close, .lcd-modal-cancel');
+        const backdrop = modal.querySelector('.lcd-modal-backdrop');
+        
+        closeButtons.forEach(button => {
+            button.addEventListener('click', closeContactModal);
+        });
+        
+        backdrop.addEventListener('click', closeContactModal);
+        
+        // Form submission
+        const form = document.getElementById('lcd-contact-form');
+        form.addEventListener('submit', handleContactFormSubmit);
+        
+        // Escape key to close modal
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && modal.style.display !== 'none') {
+                closeContactModal();
+            }
+        });
+    }
+
+    function openContactModal(precinctNumber, isBecomePCO = false) {
+        const modal = document.getElementById('lcd-contact-modal');
+        const title = document.getElementById('lcd-contact-modal-title');
+        const form = document.getElementById('lcd-contact-form');
+        const messageField = document.getElementById('contact-message');
+        
+        // Reset modal state
+        document.getElementById('lcd-contact-form').style.display = 'block';
+        document.getElementById('lcd-contact-success').style.display = 'none';
+        document.getElementById('lcd-contact-error').style.display = 'none';
+        form.reset();
+        
+        // Set form data
+        document.getElementById('contact-precinct-number').value = precinctNumber;
+        document.getElementById('contact-is-become-pco').value = isBecomePCO.toString();
+        
+        // Update modal content based on action
+        const pcoData = lcdMapData.pcoData && lcdMapData.pcoData[precinctNumber] ? 
+                       lcdMapData.pcoData[precinctNumber] : null;
+        
+        // Create consistent precinct display name
+        const precinctName = pcoData && pcoData.precinct_name ? pcoData.precinct_name : '';
+        const displayName = precinctName ? '#' + precinctNumber + ' - ' + precinctName : '#' + precinctNumber;
+        
+        if (isBecomePCO) {
+            title.textContent = 'Become a PCO - Precinct ' + displayName;
+            messageField.placeholder = 'Please tell us why you\'re interested in becoming the PCO for this precinct and any relevant experience...';
+        } else {
+            const pcoName = pcoData && pcoData.name ? pcoData.name : 'PCO';
+            title.textContent = 'Contact ' + pcoName + ' - Precinct ' + displayName;
+            messageField.placeholder = 'Enter your message here...';
+        }
+        
+        // Show modal
+        modal.style.display = 'block';
+        document.body.style.overflow = 'hidden';
+        
+        // Focus on first input
+        setTimeout(() => {
+            document.getElementById('contact-sender-name').focus();
+        }, 100);
+    }
+
+    function closeContactModal() {
+        const modal = document.getElementById('lcd-contact-modal');
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+    }
+
+    function handleContactFormSubmit(e) {
+        e.preventDefault();
+        
+        const form = e.target;
+        const submitButton = form.querySelector('button[type="submit"]');
+        const buttonText = submitButton.querySelector('.button-text');
+        const buttonLoading = submitButton.querySelector('.button-loading');
+        
+        // Show loading state
+        submitButton.disabled = true;
+        buttonText.style.display = 'none';
+        buttonLoading.style.display = 'inline';
+        
+        // Prepare form data
+        const formData = new FormData(form);
+        formData.append('action', 'lcd_contact_pco');
+        formData.append('nonce', lcdMapData.nonce);
+        
+        // Send AJAX request
+        fetch(lcdMapData.ajaxurl, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Show success message
+                document.getElementById('lcd-contact-form').style.display = 'none';
+                document.getElementById('lcd-contact-success').style.display = 'block';
+            } else {
+                // Show error message
+                document.getElementById('lcd-error-text').textContent = data.data || 'An error occurred while sending your message.';
+                document.getElementById('lcd-contact-form').style.display = 'none';
+                document.getElementById('lcd-contact-error').style.display = 'block';
+            }
+        })
+        .catch(error => {
+            console.error('Contact form error:', error);
+            document.getElementById('lcd-error-text').textContent = 'A network error occurred. Please try again.';
+            document.getElementById('lcd-contact-form').style.display = 'none';
+            document.getElementById('lcd-contact-error').style.display = 'block';
+        })
+        .finally(() => {
+            // Reset button state
+            submitButton.disabled = false;
+            buttonText.style.display = 'inline';
+            buttonLoading.style.display = 'none';
+        });
+    }
+
+    // Initialize PCO contact system
+    initializePCOContactSystem();
 }); 
