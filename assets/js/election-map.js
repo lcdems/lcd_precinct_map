@@ -168,8 +168,13 @@ jQuery(document).ready(function($) {
     }
 
     function updateVotesDisplay(votesData, electionDate) {
-        // Find max votes for scaling
-        var maxVotes = Math.max(...Object.values(votesData).map(d => d.votes));
+        // Filter out the -1 (total) row for map display
+        var precinctData = Object.fromEntries(
+            Object.entries(votesData).filter(([key]) => key !== '-1')
+        );
+        
+        // Find max votes for scaling (excluding the total row)
+        var maxVotes = Math.max(...Object.values(precinctData).map(d => d.votes));
         // Round up to nearest 100 for cleaner scale
         maxVotes = Math.ceil(maxVotes / 100) * 100;
 
@@ -182,7 +187,7 @@ jQuery(document).ready(function($) {
         window.lcdMapLayers.boundary.eachLayer(function(layer) {
             var precinctNumber = layer.feature.properties.PRECINCT_N;
             var precinctName = layer.feature.properties.PRECINCT;
-            var precinctData = votesData[precinctNumber] || { 
+            var data = precinctData[precinctNumber] || { 
                 votes: 0, 
                 active_voters: 0,
                 inactive_voters: 0,
@@ -190,7 +195,7 @@ jQuery(document).ready(function($) {
             };
             
             var baseStyle = {
-                fillColor: colorScale(precinctData.votes),
+                fillColor: colorScale(data.votes),
                 fillOpacity: 0.7,
                 color: '#666',
                 weight: 1
@@ -208,12 +213,12 @@ jQuery(document).ready(function($) {
                     color: '#333',
                     fillOpacity: 0.9
                 },
-                votes: precinctData.votes,
-                active_voters: precinctData.active_voters,
-                inactive_voters: precinctData.inactive_voters,
-                total_registered: precinctData.total_registered,
-                turnout: precinctData.active_voters > 0 ? 
-                    (precinctData.votes / precinctData.active_voters) * 100 : 0,
+                votes: data.votes,
+                active_voters: data.active_voters,
+                inactive_voters: data.inactive_voters,
+                total_registered: data.total_registered,
+                turnout: data.active_voters > 0 ? 
+                    (data.votes / data.active_voters) * 100 : 0,
                 precinctName: precinctName
             };
 
@@ -272,15 +277,33 @@ jQuery(document).ready(function($) {
         var legend = $('#lcd-election-legend');
         legend.empty();
 
-        // Calculate totals
+        // Calculate totals - exclude the -1 (total) row to avoid double-counting
         var totalVotes = 0;
         var totalActiveVoters = 0;
         var totalInactiveVoters = 0;
-        Object.values(votesData).forEach(data => {
-            totalVotes += data.votes;
-            totalActiveVoters += data.active_voters || 0;
-            totalInactiveVoters += data.inactive_voters || 0;
-        });
+        
+        // Check if we have official totals
+        var hasOfficialTotals = votesData['-1'] !== undefined;
+        
+        if (hasOfficialTotals) {
+            // Use official totals from the -1 row
+            totalVotes = votesData['-1'].votes;
+            // Sum voter registration from actual precincts only
+            Object.entries(votesData).forEach(([precinctNum, data]) => {
+                if (precinctNum !== '-1') {
+                    totalActiveVoters += data.active_voters || 0;
+                    totalInactiveVoters += data.inactive_voters || 0;
+                }
+            });
+        } else {
+            // Fallback: sum all precincts if no official totals
+            Object.values(votesData).forEach(data => {
+                totalVotes += data.votes;
+                totalActiveVoters += data.active_voters || 0;
+                totalInactiveVoters += data.inactive_voters || 0;
+            });
+        }
+        
         var totalRegistered = totalActiveVoters + totalInactiveVoters;
         var voterTurnout = totalActiveVoters > 0 ? (totalVotes / totalActiveVoters) * 100 : 0;
 
@@ -309,7 +332,11 @@ jQuery(document).ready(function($) {
         // Voting Results Statistics
         content += '<div class="voter-statistics">';
         content += '<h5>Voting Results</h5>';
-        content += '<p><strong>Total Votes Cast:</strong> ' + totalVotes.toLocaleString() + '</p>';
+        content += '<p><strong>Total Votes Cast:</strong> ' + totalVotes.toLocaleString();
+        if (hasOfficialTotals) {
+            content += ' <span style="font-size: 0.85em; color: #28a745;" title="Using official totals from election data">✓ Official</span>';
+        }
+        content += '</p>';
         content += '<p><strong>Voter Turnout:</strong> ' + voterTurnout.toFixed(1) + '%<br>';
         content += '<small>(percentage of active voters who voted)</small></p>';
         content += '</div>';
@@ -597,22 +624,18 @@ jQuery(document).ready(function($) {
         var officialTotals = results['-1'];
         var totalVotes = 0;
         var totalPopulation = 0;
-        var partyTotals = {};
+        var candidateResults = [];
 
         if (officialTotals) {
             // Use official totals from the CSV (precinct_number = -1)
             officialTotals.candidates.forEach(function(candidate) {
                 var votes = parseInt(candidate.votes, 10);
                 totalVotes += votes;
-                var party = candidate.party || 'No Party';
-                if (!partyTotals[party]) {
-                    partyTotals[party] = {
-                        votes: 0,
-                        candidates: {}
-                    };
-                }
-                partyTotals[party].votes += votes;
-                partyTotals[party].candidates[candidate.name] = votes;
+                candidateResults.push({
+                    name: candidate.name,
+                    party: candidate.party || 'No Party',
+                    votes: votes
+                });
             });
             
             // Still sum population from actual precincts (not from totals row)
@@ -623,20 +646,28 @@ jQuery(document).ready(function($) {
             });
         } else {
             // Fallback: Calculate totals from individual precincts if no official totals
+            var candidateVotes = {};
             Object.values(results).forEach(function(precinct) {
                 totalPopulation += parseInt(precinct.registered_voters || 0, 10);
                 precinct.candidates.forEach(function(candidate) {
                     var votes = parseInt(candidate.votes, 10);
-                    totalVotes += votes;
-                    var party = candidate.party || 'No Party';
-                    if (!partyTotals[party]) {
-                        partyTotals[party] = {
-                            votes: 0,
-                            candidates: {}
+                    if (!candidateVotes[candidate.name]) {
+                        candidateVotes[candidate.name] = {
+                            party: candidate.party || 'No Party',
+                            votes: 0
                         };
                     }
-                    partyTotals[party].votes += votes;
-                    partyTotals[party].candidates[candidate.name] = votes;
+                    candidateVotes[candidate.name].votes += votes;
+                });
+            });
+            
+            // Convert to array
+            Object.entries(candidateVotes).forEach(function([name, data]) {
+                totalVotes += data.votes;
+                candidateResults.push({
+                    name: name,
+                    party: data.party,
+                    votes: data.votes
                 });
             });
         }
@@ -655,29 +686,27 @@ jQuery(document).ready(function($) {
         content += '<p><strong>Overall Turnout:</strong> ' + turnoutPercentage + '%</p>';
         content += '</div>';
 
-        // Add results by party
-        content += '<h4>Results by Party</h4><ul>';
-        Object.entries(partyTotals)
-            .sort((a, b) => b[1].votes - a[1].votes)
-            .forEach(function([party, data]) {
-                var percentage = ((data.votes / totalVotes) * 100).toFixed(1);
-                var color = party !== 'No Party' ? 
-                    (lcdElectionData.partyColors[party] || '#CCCCCC') : 
+        // Add results by candidate
+        content += '<h4>Results</h4><ul>';
+        candidateResults
+            .sort((a, b) => b.votes - a.votes)
+            .forEach(function(candidate) {
+                var percentage = ((candidate.votes / totalVotes) * 100).toFixed(1);
+                var color = candidate.party !== 'No Party' ? 
+                    (lcdElectionData.partyColors[candidate.party] || '#CCCCCC') : 
                     '#CCCCCC';
-                
-                // Get candidates for this party
-                var candidateList = Object.entries(data.candidates)
-                    .sort((a, b) => b[1] - a[1])
-                    .map(([name, votes]) => name + ' (' + party + ')')
-                    .join(', ');
                 
                 content += '<li>';
                 content += '<div class="party-info">';
-                content += '<div class="party-color-square" style="background-color: ' + color + ';" title="' + candidateList + '"></div>';
-                content += '<span>' + candidateList + '</span>';
+                content += '<div class="party-color-square" style="background-color: ' + color + ';" title="' + candidate.party + '"></div>';
+                content += '<span>' + candidate.name;
+                if (candidate.party !== 'No Party') {
+                    content += ' (' + candidate.party + ')';
+                }
+                content += '</span>';
                 content += '</div>';
                 content += '<div>';
-                content += '<strong>' + data.votes.toLocaleString() + '</strong> (' + percentage + '%)';
+                content += '<strong>' + candidate.votes.toLocaleString() + '</strong> (' + percentage + '%)';
                 content += '</div>';
                 content += '</li>';
             });
