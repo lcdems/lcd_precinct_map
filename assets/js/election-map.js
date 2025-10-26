@@ -391,8 +391,14 @@ jQuery(document).ready(function($) {
         }
 
         // Process results to get total votes per precinct and winning candidate
+        // Skip the "Total" row (precinct_number = -1) as it's not a geographic precinct
         var precinctData = {};
         Object.keys(results).forEach(function(precinctNumber) {
+            // Skip the total row - it's not a real precinct
+            if (precinctNumber === '-1') {
+                return;
+            }
+            
             var precinct = results[precinctNumber];
             var totalVotes = 0;
             var winner = { votes: 0, party: null };
@@ -587,14 +593,15 @@ jQuery(document).ready(function($) {
             day: 'numeric'
         });
 
-        // Calculate totals
+        // Check if we have official totals (precinct_number = -1)
+        var officialTotals = results['-1'];
         var totalVotes = 0;
         var totalPopulation = 0;
         var partyTotals = {};
 
-        Object.values(results).forEach(function(precinct) {
-            totalPopulation += parseInt(precinct.registered_voters || 0, 10);
-            precinct.candidates.forEach(function(candidate) {
+        if (officialTotals) {
+            // Use official totals from the CSV (precinct_number = -1)
+            officialTotals.candidates.forEach(function(candidate) {
                 var votes = parseInt(candidate.votes, 10);
                 totalVotes += votes;
                 var party = candidate.party || 'No Party';
@@ -607,13 +614,42 @@ jQuery(document).ready(function($) {
                 partyTotals[party].votes += votes;
                 partyTotals[party].candidates[candidate.name] = votes;
             });
-        });
+            
+            // Still sum population from actual precincts (not from totals row)
+            Object.entries(results).forEach(function([precinctNum, precinct]) {
+                if (precinctNum !== '-1') {
+                    totalPopulation += parseInt(precinct.registered_voters || 0, 10);
+                }
+            });
+        } else {
+            // Fallback: Calculate totals from individual precincts if no official totals
+            Object.values(results).forEach(function(precinct) {
+                totalPopulation += parseInt(precinct.registered_voters || 0, 10);
+                precinct.candidates.forEach(function(candidate) {
+                    var votes = parseInt(candidate.votes, 10);
+                    totalVotes += votes;
+                    var party = candidate.party || 'No Party';
+                    if (!partyTotals[party]) {
+                        partyTotals[party] = {
+                            votes: 0,
+                            candidates: {}
+                        };
+                    }
+                    partyTotals[party].votes += votes;
+                    partyTotals[party].candidates[candidate.name] = votes;
+                });
+            });
+        }
 
         // Create race info section
         var content = '<div class="race-info">';
         content += '<h4>' + raceName + '</h4>';
         content += '<p><strong>Election Date:</strong> ' + electionDate + '</p>';
-        content += '<p><strong>Total Votes:</strong> ' + totalVotes.toLocaleString() + '</p>';
+        content += '<p><strong>Total Votes:</strong> ' + totalVotes.toLocaleString();
+        if (officialTotals) {
+            content += ' <span style="font-size: 0.85em; color: #28a745;" title="Using official totals from election data">✓ Official</span>';
+        }
+        content += '</p>';
         content += "<p><strong>Total Population:</strong> " + totalPopulation.toLocaleString() + "<br/>(includes all ages and voting status)</p>";
         var turnoutPercentage = totalPopulation > 0 ? ((totalVotes / totalPopulation) * 100).toFixed(1) : 0;
         content += '<p><strong>Overall Turnout:</strong> ' + turnoutPercentage + '%</p>';
