@@ -277,6 +277,11 @@ class LCD_County_Map_Election_Integration {
         foreach ($races as $race) {
             $results = $this->get_precinct_results($election_date, $race);
             foreach ($results as $precinct_number => $data) {
+                // Skip the total row (-1) as it's not a geographic precinct
+                if ($precinct_number === '-1') {
+                    continue;
+                }
+                
                 if (!isset($precinct_votes[$precinct_number])) {
                     $voter_counts = isset($voter_data[$precinct_number]) ? 
                         $voter_data[$precinct_number] : 
@@ -301,7 +306,34 @@ class LCD_County_Map_Election_Integration {
             }
         }
 
+        // Add the official total votes from one representative race (they should all be the same for turnout purposes)
+        // Pick the first race to get the official totals from the -1 row
+        if (!empty($races)) {
+            $first_race_results = $this->get_precinct_results($election_date, $races[0]);
+            if (isset($first_race_results['-1'])) {
+                $official_total_votes = array_reduce($first_race_results['-1']['candidates'], function($sum, $candidate) {
+                    return $sum + intval($candidate['votes']);
+                }, 0);
+                
+                // Add the official total as a special entry
+                $precinct_votes['-1'] = array(
+                    'votes' => $official_total_votes,
+                    'active_voters' => 0,
+                    'inactive_voters' => 0,
+                    'total_registered' => 0
+                );
+            }
+        }
+
+        // Get voter data import date for context
+        $voters_table = $wpdb->prefix . 'election_voters';
+        $voter_import_date = $wpdb->get_var("SELECT MAX(import_date) FROM {$voters_table}");
+        
         error_log('LCD County Map: Final precinct votes data: ' . print_r($precinct_votes, true));
-        wp_send_json_success($precinct_votes);
+        wp_send_json_success(array(
+            'precinct_votes' => $precinct_votes,
+            'voter_data_date' => $voter_import_date,
+            'election_date' => $election_date
+        ));
     }
 } 

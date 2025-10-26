@@ -152,7 +152,10 @@ jQuery(document).ready(function($) {
             },
             success: function(response) {
                 if (response.success) {
-                    updateVotesDisplay(response.data, electionDate);
+                    var data = response.data;
+                    var precinctVotes = data.precinct_votes || data; // Handle both new and old response formats
+                    var voterDataDate = data.voter_data_date;
+                    updateVotesDisplay(precinctVotes, electionDate, voterDataDate);
                 } else {
                     console.error('Failed to fetch vote data:', response);
                 }
@@ -167,7 +170,7 @@ jQuery(document).ready(function($) {
         });
     }
 
-    function updateVotesDisplay(votesData, electionDate) {
+    function updateVotesDisplay(votesData, electionDate, voterDataDate) {
         // Filter out the -1 (total) row for map display
         var precinctData = Object.fromEntries(
             Object.entries(votesData).filter(([key]) => key !== '-1')
@@ -270,10 +273,10 @@ jQuery(document).ready(function($) {
         });
 
         // Update legend
-        updateVotesLegend(votesData, electionDate, maxVotes);
+        updateVotesLegend(votesData, electionDate, maxVotes, voterDataDate);
     }
 
-    function updateVotesLegend(votesData, electionDate, maxVotes) {
+    function updateVotesLegend(votesData, electionDate, maxVotes, voterDataDate) {
         var legend = $('#lcd-election-legend');
         legend.empty();
 
@@ -310,6 +313,16 @@ jQuery(document).ready(function($) {
         // Adjust date display
         var displayDate = new Date(electionDate);
         displayDate.setDate(displayDate.getDate() + 1);
+        
+        // Check if voter registration data is from a different time period
+        var showDateWarning = false;
+        if (voterDataDate) {
+            var voterDate = new Date(voterDataDate);
+            var electionDateObj = new Date(electionDate);
+            // If voter data is more than 30 days different from election date, show warning
+            var daysDifference = Math.abs((voterDate - electionDateObj) / (1000 * 60 * 60 * 24));
+            showDateWarning = daysDifference > 30;
+        }
 
         // Create legend content
         var content = '<div class="race-info">';
@@ -324,6 +337,14 @@ jQuery(document).ready(function($) {
         // Voter Registration Statistics
         content += '<div class="voter-statistics">';
         content += '<h5>Voter Registration</h5>';
+        if (showDateWarning) {
+            content += '<div class="date-warning" style="background: #fff3cd; border: 1px solid #ffc107; padding: 8px; margin-bottom: 10px; border-radius: 4px;">';
+            content += '<strong>⚠️ Note:</strong> Voter registration data is from ' + 
+                new Date(voterDataDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) + 
+                ', which may not reflect the registration numbers at the time of this election. ';
+            content += 'Precinct boundaries and populations may have changed. Only the vote totals are historically accurate.';
+            content += '</div>';
+        }
         content += '<p><strong>Active Voters:</strong> ' + totalActiveVoters.toLocaleString() + '</p>';
         content += '<p><strong>Inactive Voters:</strong> ' + totalInactiveVoters.toLocaleString() + '</p>';
         content += '<p><strong>Total Registered:</strong> ' + totalRegistered.toLocaleString() + '</p>';
